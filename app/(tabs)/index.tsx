@@ -7,20 +7,21 @@ import {
   Dimensions,
   SafeAreaView,
 } from "react-native";
+import _ from "lodash";
 import { Audio } from "expo-av";
 import Animated, {
   withTiming,
   useSharedValue,
   useAnimatedStyle,
 } from "react-native-reanimated";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Svg, Path } from "react-native-svg";
 import Slider from "@react-native-community/slider";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SCROLL_SPEED = SCREEN_WIDTH / 10;
 
-const AudioPlayer = ({ onTimeUpdate }) => {
+const AudioPlayer = ({ onTimeUpdate, onReady }) => {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -36,6 +37,7 @@ const AudioPlayer = ({ onTimeUpdate }) => {
       { shouldPlay: true }
     );
 
+    onReady(sound);
     setSound(sound);
     setIsPlaying(true);
 
@@ -136,8 +138,10 @@ const getWordPosition = (currentTime) => {
   return closestWordIndex * wordWidth;
 };
 
-const LyricScroll = ({ currentTime }) => {
+const LyricScroll = ({ lyrics, currentTime, onSeek }) => {
+  const lineHeight = 40;
   const offset = useSharedValue(0);
+  const scrollRef = useRef<any | null>(null);
 
   useEffect(() => {
     offset.value = withTiming(currentTime * SCROLL_SPEED, { duration: 1000 });
@@ -147,9 +151,36 @@ const LyricScroll = ({ currentTime }) => {
     transform: [{ translateX: -offset.value }],
   }));
 
+  const handleScroll = _.throttle((event) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const index = Math.round(scrollY / lineHeight); // Calculate lyric index
+    const lyric = lyrics[index];
+
+    if (lyric && onSeek) {
+      onSeek(lyric.time); // Trigger parent seek with the corresponding time
+    }
+  }, 200);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const scrollPosition = getScrollPosition(currentTime, lyrics); // Calculate where to scroll
+      scrollRef.current.scrollTo({ y: scrollPosition, animated: true });
+    }
+  }, [currentTime]);
+
+  const getScrollPosition = (time, lyrics) => {
+    const index = lyrics.findIndex((lyric) => lyric.time >= time);
+    return Math.max(0, index * lineHeight);
+  };
+
   return (
     <Animated.View style={[animatedStyle]}>
-      <ScrollView horizontal>
+      <ScrollView
+        horizontal
+        ref={scrollRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {lyrics.map((line, index) => (
           <Text
             key={index}
@@ -195,12 +226,35 @@ const AnimatedNote = ({ currentTime }) => {
 
 export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(0);
+  const [audioPlayer, setAudioPlayer] = useState(null);
+
+  const handleTimeUpdate = (time) => {
+    setCurrentTime(time); // Update the current playback time
+  };
+
+  const handleSeek = async (time) => {
+    if (audioPlayer) {
+      await audioPlayer.setPositionAsync(time * 1000); // Convert seconds to milliseconds
+      setCurrentTime(time); // Update local state
+    }
+  };
+
+  const handleAudioPlayerReady = (player) => {
+    setAudioPlayer(player); // Save the reference to the AudioPlayer
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, justifyContent: "center" }}>
-      <LyricScroll currentTime={currentTime} />
+      <LyricScroll
+        currentTime={currentTime}
+        onSeek={handleSeek}
+        lyrics={lyrics}
+      />
       <AnimatedNote currentTime={currentTime} />
-      <AudioPlayer onTimeUpdate={setCurrentTime} />
+      <AudioPlayer
+        onTimeUpdate={handleTimeUpdate}
+        onReady={handleAudioPlayerReady}
+      />
     </SafeAreaView>
   );
 }
