@@ -33,10 +33,13 @@ const AudioPlayer = ({ onTimeUpdate, onReady }) => {
 
   const loadAndPlayAudio = async () => {
     const { sound } = await Audio.Sound.createAsync(
-      { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+      // {
+      //   uri: "https://drive.google.com/file/d/1U31TXzkXtqS430d9XFRNiEFwjAy9AGgd/view?usp=sharing",
+      // },
+      // { shouldPlay: true }
+      require("../../assets/test.mp3"),
       { shouldPlay: true }
     );
-
     onReady(sound);
     setSound(sound);
     setIsPlaying(true);
@@ -114,11 +117,18 @@ const AudioPlayer = ({ onTimeUpdate, onReady }) => {
 };
 
 const lyrics = [
-  { time: 0, text: "This" },
-  { time: 1, text: "is" },
-  { time: 2, text: "the" },
-  { time: 3, text: "song" },
-  { time: 4, text: "lyrics" },
+  { time: 1, text: "I" },
+  { time: 3, text: "want" },
+  { time: 5, text: "you to know" },
+  { time: 6, text: `that I'm` },
+  { time: 7, text: `happy` },
+  { time: 8, text: `for you` },
+  { time: 11, text: "I" },
+  { time: 12, text: "wish" },
+  { time: 13, text: "nothing but" },
+  { time: 15, text: "the best" },
+  { time: 16, text: "for" },
+  { time: 17, text: "you both" },
 ];
 
 const getWordPosition = (currentTime) => {
