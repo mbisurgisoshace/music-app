@@ -38,13 +38,42 @@ const LyricScroll: React.FC<LyricScrollProps> = ({
   const notePosition = useSharedValue(0);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const wordWidths = useRef<number[]>([]); // To store widths of each word
+  const totalWidth = useRef<number>(0); // Total scrollable width
 
+  // useEffect(() => {
+  //   const scrollWidth = width * lyrics.length; // Total scrollable width
+  //   const targetPosition = (currentTime / duration) * scrollWidth;
+  //   scrollPosition.value = withTiming(targetPosition, { duration: 300 });
+
+  //   // Find current word and its cumulative width
+  //   const currentIndex = lyrics.findIndex((lyric, index) => {
+  //     const nextLyric = lyrics[index + 1];
+  //     return (
+  //       currentTime >= lyric.time &&
+  //       (nextLyric ? currentTime < nextLyric.time : true)
+  //     );
+  //   });
+
+  //   // Calculate the position of the note
+  //   let totalWidthBeforeCurrentWord = 0;
+  //   for (let i = 0; i < currentIndex; i++) {
+  //     totalWidthBeforeCurrentWord += wordWidths.current[i] || 0;
+  //   }
+
+  //   notePosition.value = withTiming(totalWidthBeforeCurrentWord, {
+  //     duration: 300,
+  //   });
+  // }, [currentTime, duration, lyrics]);
   useEffect(() => {
+    //if (isUserScrolling || totalWidth.current === 0) return;
+
+    // Calculate scroll position
     const scrollWidth = width * lyrics.length; // Total scrollable width
     const targetPosition = (currentTime / duration) * scrollWidth;
     scrollPosition.value = withTiming(targetPosition, { duration: 300 });
 
-    // Find current word and its cumulative width
+    // Calculate note position
+    let cumulativeWidth = 0;
     const currentIndex = lyrics.findIndex((lyric, index) => {
       const nextLyric = lyrics[index + 1];
       return (
@@ -53,16 +82,16 @@ const LyricScroll: React.FC<LyricScrollProps> = ({
       );
     });
 
-    // Calculate the position of the note
-    let totalWidthBeforeCurrentWord = 0;
     for (let i = 0; i < currentIndex; i++) {
-      totalWidthBeforeCurrentWord += wordWidths.current[i] || 0;
+      cumulativeWidth += wordWidths.current[i] || 0;
     }
 
-    notePosition.value = withTiming(totalWidthBeforeCurrentWord, {
-      duration: 300,
-    });
-  }, [currentTime, duration, lyrics]);
+    const clampedNotePosition = Math.min(
+      cumulativeWidth,
+      totalWidth.current - width
+    );
+    notePosition.value = withTiming(clampedNotePosition, { duration: 300 });
+  }, [currentTime, duration, lyrics, isUserScrolling]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: -scrollPosition.value }],
@@ -89,7 +118,12 @@ const LyricScroll: React.FC<LyricScrollProps> = ({
 
   const handleWordLayout = (index: number, event: any) => {
     const width = event.nativeEvent.layout.width;
-    wordWidths.current[index] = width; // Store the width of the word
+    wordWidths.current[index] = width;
+
+    // Update total width if all words are measured
+    if (index === lyrics.length - 1) {
+      totalWidth.current = wordWidths.current.reduce((acc, w) => acc + w, 0);
+    }
   };
 
   return (
